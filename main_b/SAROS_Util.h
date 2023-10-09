@@ -1,18 +1,26 @@
 //////////////////
 //SAROS_Util
-//Version: 1.1
-//Date: 7/7/2023
-//Supported Main: 1.X
+//Version: 1.5
+//Date: 09/15/2023
+//Supported Main: 2.X
 //Author: Tristan McGinnis
 //Use: Contains supplementary functions and values used for SAROS payloads
 ///////////////////
 #include <Wire.h> 
 
+
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
+//#include <SparkFun_u-blox_GNSS_v3.h>
+
 #include <Adafruit_Sensor.h> 
 #include <Adafruit_BNO055.h> 
-#include <utility/imumaths.h> 
-#include "Adafruit_BMP3XX.h" 
+#include <utility/imumaths.h>
+#include "Zanshin_BME680.h"
+//#include "libraries/BME680/src/Zanshin_BME680.h"
+//#include "Adafruit_BME680.h"
+//#include "libraries/cus_bme680/BME680.h"
+#include "ADS1X15.h"
+//#include <Adafruit_ADS1X15.h>
 #include "Adafruit_SHT4x.h" 
 #include <SD.h>
 #include <SPI.h>
@@ -22,12 +30,14 @@ sensors_event_t orientationData , angVelocityData , linearAccelData, magnetomete
 //Functions in this library
 String printEvent(sensors_event_t* event);
 String readBno(Adafruit_BNO055 bno, int type);
-void ledPulse(int led_pin,int blinkSpeed, unsigned int curTime , unsigned int *lastToggle);
+void ledToggle(int led_pin);
+void ledPulse(int led_pin,int blinkSpeed, unsigned long curTime , unsigned long *lastToggle);
 void setWire0(int pin_SCL, int pin_SDA);
 void setWire1(int pin_SCL, int pin_SDA);
-boolean threadFunc(int freq, unsigned int curTime , unsigned int *lastRun);
+void ledCode(int led1, int led2, int led3, int code);
+boolean threadFunc(int freq, unsigned long curTime , unsigned long *lastRun);
 
-
+String getBoardID();
 
 
 void setWire0(int pin_SCL, int pin_SDA)
@@ -42,7 +52,185 @@ void setWire1(int pin_SCL, int pin_SDA)
   Wire1.setSCL(pin_SCL); 
 }
 
-void ledPulse(int led_pin,int blinkSpeed, unsigned int curTime , unsigned int *lastToggle)
+
+
+void ledCode(int led1, int led2, int led3, int code) //Flash a specific LED code
+{
+  //o-off s-static f-flashing
+  digitalWrite(led1, LOW);
+  digitalWrite(led2, LOW);
+  digitalWrite(led3, LOW);
+
+  int blink_count = 10;
+  int delay_len = 150;
+
+  switch(code){
+    case -1: //Blue-f Green-f Red-f
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led1);
+        ledToggle(led2);
+        ledToggle(led3);
+        delay(delay_len);
+        ledToggle(led1);
+        ledToggle(led2);
+        ledToggle(led3);
+        delay(delay_len);
+      }
+      break;
+    case 0: //Blue-f Green-o Red-o
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led1);
+        delay(delay_len);
+        ledToggle(led1);
+        delay(delay_len);
+      }
+      break;
+    case 1: //Blue-o Green-f Red-o
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led2);
+        delay(delay_len);
+        ledToggle(led2);
+        delay(delay_len);
+      }
+      break;
+    case 2: //Blue-o Green-o Red-f
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led3);
+        delay(delay_len);
+        ledToggle(led3);
+        delay(delay_len);
+      }
+      break;
+    case 3: //Blue-s Green-f Red-o
+      ledToggle(led1);
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led2);
+        delay(delay_len);
+        ledToggle(led2);
+        delay(delay_len);
+      }
+      break;
+    case 4: //Blue-s Green-o Red-f
+      ledToggle(led1);
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led3);
+        delay(delay_len);
+        ledToggle(led3);
+        delay(delay_len);
+      }
+      break;
+    case 5: //Blue-f Green-s Red-o
+      ledToggle(led2);
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led1);
+        delay(delay_len);
+        ledToggle(led1);
+        delay(delay_len);
+      }
+      break;
+    case 6: //Blue-o Green-s Red-f
+      ledToggle(led2);
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led3);
+        delay(delay_len);
+        ledToggle(led3);
+        delay(delay_len);
+      }
+      break;
+    case 7: //Blue-f Green-o Red-s
+      ledToggle(led3);
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led1);
+        delay(delay_len);
+        ledToggle(led1);
+        delay(delay_len);
+      }
+      break;
+    case 8: //Blue-o Green-f Red-s
+      ledToggle(led3);
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led2);
+        delay(delay_len);
+        ledToggle(led2);
+        delay(delay_len);
+      }
+      break;
+    case 9: //Blue-f Green-f Red-o
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led1);
+        ledToggle(led2);
+        delay(delay_len);
+        ledToggle(led1);
+        ledToggle(led2);
+        delay(delay_len);
+      }
+      break;
+    case 10: //Blue-o Green-f Red-f
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led2);
+        ledToggle(led3);
+        delay(delay_len);
+        ledToggle(led2);
+        ledToggle(led3);
+        delay(delay_len);
+      }
+      break;
+    case 11: //Blue-f Green-o Red-f
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led1);
+        ledToggle(led3);
+        delay(delay_len);
+        ledToggle(led1);
+        ledToggle(led3);
+        delay(delay_len);
+      }
+      break;
+    case 20: //Rolling LEDS
+      for(int i = 0; i < blink_count; i++)
+      {
+        ledToggle(led1);
+        delay(50);
+        ledToggle(led1);
+        ledToggle(led2);
+        delay(50);
+        ledToggle(led2);
+        ledToggle(led3);
+        delay(50);
+        ledToggle(led3);
+        delay(50);
+        ledToggle(led3);
+        delay(delay_len);
+      }
+    default:
+      break;
+  }
+
+  digitalWrite(led1, LOW);
+  digitalWrite(led2, LOW);
+  digitalWrite(led3, LOW);
+}
+    
+
+void ledToggle(int led_pin) //Toggles LED from it's current status
+{
+  digitalWrite(led_pin, !digitalRead(led_pin));
+}
+
+
+void ledPulse(int led_pin,int blinkSpeed, unsigned long curTime , unsigned long *lastToggle)//Pulse LED at desired rate w/o hold
 {
   if(int(curTime - *lastToggle) >= blinkSpeed) //If it's time or past time to toggle
   {
@@ -51,7 +239,20 @@ void ledPulse(int led_pin,int blinkSpeed, unsigned int curTime , unsigned int *l
   }
 }
 
-boolean threadFunc(int freq, unsigned int curTime , unsigned int *lastRun)
+void ledBlink(int led_pin, int speed, int count) //Blink led at desired speed, desired amount of times, w/ system hold (delays)
+{
+  digitalWrite(led_pin, LOW);
+  for(int i = 0; i < count; i++)
+  {
+    ledToggle(led_pin);
+    delay(speed);
+    ledToggle(led_pin);
+    delay(speed);
+  }
+}
+
+
+boolean threadFunc(int freq, unsigned long curTime , unsigned long *lastRun)
 {
   if(int(curTime - *lastRun) >= freq) //If it's time or past time to run
   {
@@ -138,6 +339,32 @@ String printEvent(sensors_event_t* event) {
   returnValues = String(x) + "," + String(y) + "," + String(z);
   return returnValues;
 }
+
+
+String getBoardID()
+{
+  //Pull the board ID# from the id.txt file on the SD card
+  if (SD.exists("id.txt"))
+  {
+    String inputID = "";
+    File idFile = SD.open("id.txt", FILE_READ);
+    while (idFile.available())
+    {
+      char buf = char(idFile.read());
+      
+      inputID += buf;
+    }
+    String String_ID = String(inputID);
+    idFile.close();
+    return String_ID;
+  }else
+  {
+    return "ERR";
+  }
+
+}
+
+
 
 
 
