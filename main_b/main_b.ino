@@ -1,6 +1,6 @@
 ///////////////////
 //SAROS_TestFlight_Main
-//Version: 2.5
+//Version: 2.6
 //Date: 10/08/2023
 //Author: Tristan McGinnis
 //Use: Main source code for SAROS test board
@@ -178,7 +178,7 @@ void setup() {
     if(gps.begin(Wire1, 0x42) == true)
     {
       gps.setI2COutput(COM_TYPE_UBX);
-      gps.setNavigationFrequency(4);
+      gps.setNavigationFrequency(5);
       gps.setI2CpollingWait(250);
 
       Serial.println("NEO-M9N\t[X]");
